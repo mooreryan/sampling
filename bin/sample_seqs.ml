@@ -1,6 +1,21 @@
 open! Core
 open Lib
 
+module Version = struct
+  let base = "1.0.0"
+
+  let version =
+    (* git describe --always --dirty --abbrev=7 *)
+    let git_hash =
+      match%const [%getenv "SAMPLING_GIT_COMMIT_HASH"] with
+      | "" ->
+          ""
+      | git_hash ->
+          [%string " [%{git_hash}]"]
+    in
+    [%string "%{base}%{git_hash}"]
+end
+
 module Cli = struct
   open Cmdliner
 
@@ -90,8 +105,7 @@ module Cli = struct
            indices for each file (w/o replacement within a single output file) \
            to sample, and 3) iterating through the file to do the sampling." ]
     in
-    let version = "1.0.0" in
-    Cmd.info prog_name ~version ~doc ~man ~exits:[]
+    Cmd.info prog_name ~version:Version.version ~doc ~man ~exits:[]
 
   let parse_argv () =
     match Cmd.eval_value @@ Cmd.v info opts with

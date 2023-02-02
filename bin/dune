@@ -15,4 +15,4 @@
   fmt.tty
   shexp.process)
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_getenv ppx_const ppx_jane)))
