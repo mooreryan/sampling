@@ -1,0 +1,18 @@
+(executable
+ (name sample_seqs)
+ (public_name sample_seqs)
+ (libraries
+  bio_io
+  cmdliner
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  core_unix.time_unix
+  lib
+  logs
+  logs.fmt
+  fmt.tty
+  shexp.process)
+ (preprocess
+  (pps ppx_jane)))

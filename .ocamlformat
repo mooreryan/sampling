@@ -1,0 +1,7 @@
+ocaml-version=4.14
+version = 0.23.0
+profile = ocamlformat
+parse-docstrings = true
+wrap-comments = true
+wrap-fun-args = false
+break-infix = fit-or-vertical
