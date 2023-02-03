@@ -157,7 +157,13 @@ end
 
 let write_samples file samples =
   let open Bio_io.Fasta in
+  let log i =
+    if i % 500000 = 0 then
+      let i = Float.(of_int i / of_int 1000000) in
+      eprintf "Reading seq: %.1fM\r%!" i
+  in
   In_channel.with_file_iteri_records file ~f:(fun i record ->
+      log i ;
       Array.iter samples ~f:(fun Sample.{out_channel; indices} ->
           if Set.mem indices i then
             Out_channel.output_string out_channel (Record.to_string_nl record) ) )

@@ -1,14 +1,14 @@
 Yo
 
   $ sample_seqs seqs.fa 3 --samples 4 2> log
-  $ cut -f4- -d' ' log
-  ((file seqs.fa)(outdir samples)(basename seqs)(nseqs 3)(nsamples 4)(seed 30355))
-  Making out channels
-  Counting total number seqs
-  Total number of seqs: 10
-  Getting random samples
-  Sampling...
-  Done!
+  $ sed -E 's/[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/DATETIME/' log
+  INFO [DATETIME] ((file seqs.fa)(outdir samples)(basename seqs)(nseqs 3)(nsamples 4)(seed 30355))
+  INFO [DATETIME] Making out channels
+  INFO [DATETIME] Counting total number seqs
+  INFO [DATETIME] Total number of seqs: 10
+  INFO [DATETIME] Getting random samples
+  INFO [DATETIME] Sampling...
+  Reading seq: 0.0MINFO [DATETIME] Done!
   $ tree
   .
   |-- log
