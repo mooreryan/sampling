@@ -168,6 +168,10 @@ let write_samples file samples =
           if Set.mem indices i then
             Out_channel.output_string out_channel (Record.to_string_nl record) ) )
 
+let close_out_channels samples =
+  Array.iter samples ~f:(fun Sample.{out_channel; _} ->
+      Out_channel.close out_channel )
+
 let main () =
   Logging.set_up_logging "debug" ;
   let opts = Cli.parse_argv () in
@@ -194,6 +198,7 @@ let main () =
   let samples = Array.map2_exn out_channels random_samples ~f:Sample.create in
   Logs.info (fun m -> m "Sampling...") ;
   write_samples opts.file samples ;
+  close_out_channels samples ;
   Logs.info (fun m -> m "Done!")
 
 let () = main ()
