@@ -4,7 +4,7 @@
 
 (name sampling)
 
-(version 1.0.0)
+(version 1)
 
 (maintainers "Ryan M. Moore")
 
