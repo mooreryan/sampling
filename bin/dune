@@ -1,19 +1,6 @@
 (executables
  (names sample_seqs sample_without_replacement)
  (public_names sample_seqs sample_without_replacement)
- (libraries
-  bio_io
-  cmdliner
-  core
-  core_unix
-  core_unix.filename_unix
-  core_unix.sys_unix
-  core_unix.time_unix
-  iter
-  lib
-  logs
-  logs.fmt
-  fmt.tty
-  shexp.process)
+ (libraries bio_io cmdliner core core_unix iter lib logs logs.fmt fmt.tty)
  (preprocess
   (pps ppx_getenv ppx_const ppx_jane)))

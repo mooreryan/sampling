@@ -4,96 +4,15 @@ open Lib
 module Version = struct
   let base = "1.0.0"
 
-  let version =
-    (* git describe --always --dirty --abbrev=7 *)
-    let git_hash =
-      match%const [%getenv "SAMPLING_GIT_COMMIT_HASH"] with
-      | "" ->
-          ""
-      | git_hash ->
-          [%string " [%{git_hash}]"]
-    in
-    [%string "%{base}%{git_hash}"]
+  let version = [%string "%{base}%{Lib.Version.git_hash}"]
 end
 
 module Cli = struct
   open Cmdliner
-
-  let ( let+ ) v f = Term.(const f $ v)
-
-  let ( and+ ) v1 v2 = Term.(const (fun x y -> (x, y)) $ v1 $ v2)
+  include Lib.Cli
+  include Lib.Cli.Sampling_shared
 
   let prog_name = "sample_seqs"
-
-  type opts =
-    { file: string
-    ; outdir: string
-    ; basename: string
-    ; nseqs: int
-    ; nsamples: int
-    ; seed: int }
-  [@@deriving sexp_of]
-
-  let opts_to_string opts = Sexp.to_string @@ [%sexp_of: opts] opts
-
-  let non_existing_file =
-    let parser =
-      Arg.parser_of_kind_of_string
-        ~kind:"a file/dir that does not exist"
-        (fun s -> if Sys_unix.file_exists_exn s then None else Some s)
-    in
-    let printer = Format.pp_print_string in
-    Arg.conv (parser, printer)
-
-  let strictly_positive_int =
-    let parser =
-      Arg.parser_of_kind_of_string ~kind:"an int >= 1" (fun s ->
-          let open Option.Let_syntax in
-          let%bind n = try Some (Int.of_string s) with _ -> None in
-          if n >= 1 then Some n else None )
-    in
-    let printer = Format.pp_print_int in
-    Arg.conv (parser, printer)
-
-  let file =
-    let doc = "Path to fasta file (should exist)" in
-    Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"FASTA" ~doc)
-
-  let outdir =
-    let doc = "Path to output directory (should not exist)" in
-    Arg.(
-      value
-      & opt non_existing_file "samples"
-      & info ["outdir"] ~docv:"OUTDIR" ~doc )
-
-  let basename =
-    let doc = "Basename for output files" in
-    Arg.(value & opt string "seqs" & info ["basename"] ~docv:"BASENAME" ~doc)
-
-  let nseqs =
-    let doc = "Size of sample (i.e., number of seqs per sample)" in
-    Arg.(
-      required
-      & pos 1 (some strictly_positive_int) None
-      & info [] ~docv:"SEQS_PER_SAMPLE" ~doc )
-
-  let nsamples =
-    let doc = "Number of samples to take" in
-    Arg.(
-      value
-      & opt strictly_positive_int 1
-      & info ["samples"] ~docv:"NUM_SAMPLES" ~doc )
-
-  let seed =
-    let doc = "Seed for random number generator" in
-    Arg.(
-      value
-      & opt strictly_positive_int 30355
-      & info ["seed"] ~docv:"NUM_SAMPLES" ~doc )
-
-  let opts : opts Term.t =
-    let+ file and+ outdir and+ basename and+ nseqs and+ nsamples and+ seed in
-    {file; outdir; basename; nseqs; nsamples; seed}
 
   let info =
     let doc = "sample sequences from a FASTA file" in
@@ -116,23 +35,6 @@ module Cli = struct
     | Error _ ->
         exit 1
 end
-
-let total_seqs file =
-  Shexp_process.run "rg" ["-c"; "^>"; file]
-  |> Shexp_process.capture [Shexp_process.Std_io.Stdout]
-  |> Shexp_process.eval
-  |> snd
-  |> String.strip
-  |> Int.of_string
-
-let out_channels ~outdir ~basename ~nsamples =
-  let out_channel i =
-    let name =
-      Filename_unix.realpath outdir ^/ [%string "%{basename}.%{i#Int}.fa"]
-    in
-    Out_channel.create ~fail_if_exists:true name
-  in
-  Array.init nsamples ~f:out_channel
 
 let random_samples ~num_samples ~seqs_per_sample ~total_seqs =
   let random_sample ~num_to_take ~total_seqs =
@@ -157,13 +59,8 @@ end
 
 let write_samples file samples =
   let open Bio_io.Fasta in
-  let log i =
-    if i % 500000 = 0 then
-      let i = Float.(of_int i / of_int 1000000) in
-      eprintf "Reading seq: %.1fM\r%!" i
-  in
   In_channel.with_file_iteri_records file ~f:(fun i record ->
-      log i ;
+      Utils.log i ;
       Array.iter samples ~f:(fun Sample.{out_channel; indices} ->
           if Set.mem indices i then
             Out_channel.output_string out_channel (Record.to_string_nl record) ) )
@@ -180,13 +77,13 @@ let main () =
   Random.init opts.seed ;
   Logs.info (fun m -> m "Making out channels") ;
   let out_channels =
-    out_channels
+    Utils.out_channels
       ~outdir:opts.outdir
       ~basename:opts.basename
       ~nsamples:opts.nsamples
   in
   Logs.info (fun m -> m "Counting total number seqs") ;
-  let total_seqs = total_seqs opts.file in
+  let total_seqs = Utils.total_seqs opts.file in
   Logs.info (fun m -> m "Total number of seqs: %d" total_seqs) ;
   Logs.info (fun m -> m "Getting random samples") ;
   let random_samples =

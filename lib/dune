@@ -1,5 +1,15 @@
 (library
  (name lib)
- (libraries core core_unix core_unix.time_unix logs logs.fmt fmt.tty)
+ (libraries
+  cmdliner
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  core_unix.time_unix
+  logs
+  logs.fmt
+  fmt.tty
+  shexp.process)
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_getenv ppx_const ppx_jane)))
