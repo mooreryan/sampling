@@ -1,6 +1,6 @@
-(executable
- (name sample_seqs)
- (public_name sample_seqs)
+(executables
+ (names sample_seqs sample_without_replacement)
+ (public_names sample_seqs sample_without_replacement)
  (libraries
   bio_io
   cmdliner
@@ -9,6 +9,7 @@
   core_unix.filename_unix
   core_unix.sys_unix
   core_unix.time_unix
+  iter
   lib
   logs
   logs.fmt

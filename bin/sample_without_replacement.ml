@@ -102,8 +102,15 @@ module Cli = struct
       ; `P
           "Samples sequences from a FASTA file by 1) determining the number of \
            sequences in the file with ripgrep, 2) generating random sequence \
-           indices for each file (w/o replacement within a single output file) \
-           to sample, and 3) iterating through the file to do the sampling." ]
+           indices across all output files (i.e., no repeats across ALL \
+           sampled sequences) , and 3) iterating through the file to do the \
+           sampling."
+      ; `P
+          "If the sample_size * num_samples is greater than the total number \
+           of sequences per sample, then some of the files will have fewer \
+           sequences than expected given the input arguments.  In this case, \
+           it will basically shuffle sequences into the given number of files."
+      ]
     in
     Cmd.info prog_name ~version:Version.version ~doc ~man ~exits:[]
 
@@ -134,43 +141,33 @@ let out_channels ~outdir ~basename ~nsamples =
   in
   Array.init nsamples ~f:out_channel
 
-let random_samples ~num_samples ~seqs_per_sample ~total_seqs =
-  let random_sample ~num_to_take ~total_seqs =
-    let rec add_n numbers =
-      let n = Random.int total_seqs in
-      if Set.mem numbers n then add_n numbers else Set.add numbers n
-    in
-    let rec loop numbers =
-      if Set.length numbers >= num_to_take then numbers
-      else loop (add_n numbers)
-    in
-    loop Int.Set.empty
-  in
-  Array.init num_samples ~f:(fun _ ->
-      random_sample ~num_to_take:seqs_per_sample ~total_seqs )
+let get_indices ~total_seqs ~seqs_per_sample ~num_samples =
+  Iter.(0 -- (total_seqs - 1))
+  |> Iter.sample (seqs_per_sample * num_samples)
+  |> Set.of_array (module Int)
 
-module Sample = struct
-  type t = {out_channel: Out_channel.t; indices: Int.Set.t}
-
-  let create out_channel indices = {out_channel; indices}
-end
-
-let write_samples file samples =
-  let open Bio_io.Fasta in
+let write_samples in_file out_channels indices =
+  let num_samples = Array.length out_channels in
   let log i =
     if i % 500000 = 0 then
       let i = Float.(of_int i / of_int 1000000) in
       eprintf "Reading seq: %.1fM\r%!" i
   in
-  In_channel.with_file_iteri_records file ~f:(fun i record ->
+  let open Bio_io.Fasta in
+  In_channel.with_file_foldi_records
+    in_file
+    ~init:0
+    ~f:(fun i oc_index record ->
       log i ;
-      Array.iter samples ~f:(fun Sample.{out_channel; indices} ->
-          if Set.mem indices i then
-            Out_channel.output_string out_channel (Record.to_string_nl record) ) )
+      if Set.mem indices i then
+        let oc = Array.get out_channels (oc_index % num_samples) in
+        let _ = Out_channel.output_string oc (Record.to_string_nl record) in
+        oc_index + 1
+      else oc_index )
+  |> ignore
 
-let close_out_channels samples =
-  Array.iter samples ~f:(fun Sample.{out_channel; _} ->
-      Out_channel.close out_channel )
+let close_out_channels out_channels =
+  Array.iter out_channels ~f:Out_channel.close
 
 let main () =
   Logging.set_up_logging "debug" ;
@@ -188,17 +185,16 @@ let main () =
   Logs.info (fun m -> m "Counting total number seqs") ;
   let total_seqs = total_seqs opts.file in
   Logs.info (fun m -> m "Total number of seqs: %d" total_seqs) ;
-  Logs.info (fun m -> m "Getting random samples") ;
-  let random_samples =
-    random_samples
+  Logs.info (fun m -> m "Generating random indices") ;
+  let indices =
+    get_indices
       ~num_samples:opts.nsamples
       ~seqs_per_sample:opts.nseqs
       ~total_seqs
   in
-  let samples = Array.map2_exn out_channels random_samples ~f:Sample.create in
   Logs.info (fun m -> m "Sampling...") ;
-  write_samples opts.file samples ;
-  close_out_channels samples ;
+  write_samples opts.file out_channels indices ;
+  close_out_channels out_channels ;
   Logs.info (fun m -> m "Done!")
 
 let () = main ()
